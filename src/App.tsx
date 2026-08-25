@@ -1,77 +1,64 @@
-import { useEffect, useState } from "react";
-import { WelcomeScreen } from "./components/WelcomeScreen";
-import { Workspace } from "./components/Workspace";
-import {
-  forgetKey,
-  loadActiveProjectId,
-  loadKey,
-  loadProjects,
-  loadSettings,
-  saveActiveProjectId,
-  saveKey,
-  saveProjects,
-  saveSettings,
-} from "./lib/storage";
-import type { AppSettings, Project } from "./types";
+import { useState } from "react";
+import type { QuizConfig } from "./types";
+import type { PreparedQuestion } from "./lib/quiz";
+import { buildQuiz } from "./lib/quiz";
+import { HomeScreen } from "./components/HomeScreen";
+import { QuizScreen } from "./components/QuizScreen";
+import { ResultsScreen } from "./components/ResultsScreen";
+
+type Screen = "home" | "quiz" | "results";
 
 export function App() {
-  const [settings, setSettings] = useState<AppSettings>(() => loadSettings());
-  const [apiKey, setApiKey] = useState(() => loadKey());
-  const [ready, setReady] = useState(() => Boolean(loadKey()));
-  const [projects, setProjects] = useState<Project[]>(() => loadProjects());
-  const [activeId, setActiveId] = useState<string | null>(() => {
-    const saved = loadActiveProjectId();
-    const all = loadProjects();
-    if (saved && all.some((p) => p.id === saved)) return saved;
-    return all[0]?.id ?? null;
-  });
+  const [screen, setScreen] = useState<Screen>("home");
+  const [mode, setMode] = useState<"study" | "exam">("study");
+  const [config, setConfig] = useState<QuizConfig | null>(null);
+  const [prepared, setPrepared] = useState<PreparedQuestion[]>([]);
+  const [answers, setAnswers] = useState<Record<string, number>>({});
+  const [sessionKey, setSessionKey] = useState(0);
 
-  useEffect(() => {
-    saveSettings(settings);
-    saveKey(apiKey, settings.rememberKey);
-  }, [settings, apiKey]);
+  const startQuiz = (cfg: QuizConfig, practiceMode: "study" | "exam") => {
+    setMode(practiceMode);
+    setConfig(cfg);
+    setPrepared(buildQuiz(cfg));
+    setAnswers({});
+    setSessionKey((k) => k + 1);
+    setScreen("quiz");
+  };
 
-  useEffect(() => {
-    saveProjects(projects);
-  }, [projects]);
+  const finishQuiz = (finalAnswers: Record<string, number>) => {
+    setAnswers(finalAnswers);
+    setScreen("results");
+  };
 
-  useEffect(() => {
-    saveActiveProjectId(activeId);
-  }, [activeId]);
+  const retake = () => {
+    if (config) setPrepared(buildQuiz(config));
+    setAnswers({});
+    setSessionKey((k) => k + 1);
+    setScreen("quiz");
+  };
 
-  function patchSettings(patch: Partial<AppSettings>) {
-    setSettings((s) => ({ ...s, ...patch }));
-  }
-
-  if (!ready) {
-    return (
-      <WelcomeScreen
-        settings={settings}
-        apiKey={apiKey}
-        onSettings={patchSettings}
-        onKey={setApiKey}
-        onReady={() => setReady(true)}
-      />
-    );
-  }
+  const goHome = () => setScreen("home");
 
   return (
-    <Workspace
-      settings={settings}
-      apiKey={apiKey}
-      projects={projects}
-      activeId={activeId}
-      onSettings={patchSettings}
-      onKey={setApiKey}
-      onForget={() => {
-        forgetKey();
-        setApiKey("");
-        patchSettings({ rememberKey: false });
-        setReady(false);
-      }}
-      onProjects={setProjects}
-      onActive={setActiveId}
-      onLock={() => setReady(false)}
-    />
+    <div className="app">
+      {screen === "home" && <HomeScreen onStart={startQuiz} />}
+      {screen === "quiz" && (
+        <QuizScreen
+          key={sessionKey}
+          prepared={prepared}
+          mode={mode}
+          onFinish={finishQuiz}
+          onExit={goHome}
+        />
+      )}
+      {screen === "results" && (
+        <ResultsScreen
+          prepared={prepared}
+          answers={answers}
+          onRetry={retake}
+          onHome={goHome}
+        />
+      )}
+    </div>
   );
 }
