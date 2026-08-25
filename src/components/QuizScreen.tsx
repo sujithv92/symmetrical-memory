@@ -18,6 +18,7 @@ export function QuizScreen({ prepared, mode, onFinish, onExit }: Props) {
 
   const current = prepared[index];
   const total = prepared.length;
+  // answers store the *actual* option index (into question.options)
   const selected = answers[current.question.id];
 
   useEffect(() => {
@@ -39,9 +40,12 @@ export function QuizScreen({ prepared, mode, onFinish, onExit }: Props) {
     [answers, prepared],
   );
 
-  const choose = (optionIndex: number) => {
+  const choose = (actualOptionIndex: number) => {
     if (mode === "study" && selected !== undefined) return; // locked in study mode
-    setAnswers((prev) => ({ ...prev, [current.question.id]: optionIndex }));
+    setAnswers((prev) => ({
+      ...prev,
+      [current.question.id]: actualOptionIndex,
+    }));
   };
 
   const next = () => {
@@ -64,10 +68,7 @@ export function QuizScreen({ prepared, mode, onFinish, onExit }: Props) {
     onFinish(answers);
   };
 
-  const isCorrect =
-    selected !== undefined &&
-    current.question.options[selected] ===
-      current.question.options[current.question.correctIndex];
+  const isCorrect = selected === current.question.correctIndex;
 
   const minutes = Math.floor(elapsed / 60);
   const seconds = elapsed % 60;
@@ -102,19 +103,17 @@ export function QuizScreen({ prepared, mode, onFinish, onExit }: Props) {
             source:{" "}
             {current.question.source === "online"
               ? "online"
-              : current.question.source === "github-patrickwiloak"
-                ? "GitHub"
-                : "GitHub"}
+              : "GitHub"}
           </span>
         </div>
 
         <h2 className="q-prompt">{current.question.prompt}</h2>
 
         <div className="options">
-          {current.question.options.map((option, i) => {
-            const correct =
-              i === current.question.correctIndex;
-            const isSelected = selected === i;
+          {current.optionOrder.map((optionIndex, position) => {
+            const option = current.question.options[optionIndex];
+            const correct = optionIndex === current.question.correctIndex;
+            const isSelected = selected === optionIndex;
             let cls = "option";
             if (mode === "study" && selected !== undefined) {
               if (correct) cls += " option-correct";
@@ -124,12 +123,12 @@ export function QuizScreen({ prepared, mode, onFinish, onExit }: Props) {
             }
             return (
               <button
-                key={i}
+                key={optionIndex}
                 className={cls}
-                onClick={() => choose(i)}
+                onClick={() => choose(optionIndex)}
                 disabled={mode === "study" && selected !== undefined}
               >
-                <span className="option-letter">{LETTERS[i]}</span>
+                <span className="option-letter">{LETTERS[position]}</span>
                 <span className="option-text">{option}</span>
                 {mode === "study" && selected !== undefined && correct && (
                   <span className="option-mark">✓</span>
@@ -149,9 +148,8 @@ export function QuizScreen({ prepared, mode, onFinish, onExit }: Props) {
               {isCorrect ? "Correct" : "Incorrect"}
               {!isCorrect && (
                 <span className="feedback-correct">
-                  Correct answer:{" "}
-                  {LETTERS[current.question.correctIndex]} —{" "}
-                  {current.question.options[current.question.correctIndex]}
+                  {" "}
+                  Correct answer: {current.question.options[current.question.correctIndex]}
                 </span>
               )}
             </div>
