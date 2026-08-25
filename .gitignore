@@ -6,3 +6,6 @@ dist-ssr
 .vscode
 .idea
 *.tsbuildinfo
+
+# build artifacts (not committed; download instead)
+*.zip
